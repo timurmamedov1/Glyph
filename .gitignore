@@ -1,0 +1,4 @@
+glyph
+*.o
+*.dSYM/
+.DS_Store
