@@ -1,6 +1,6 @@
 LANG = g++
 FLAGS = -std=c++17 -Wall -Wextra -Werror -g
-SRC = src/main.cpp src/lexer.cpp src/parser.cpp src/evaluator.cpp
+SRC = src/main.cpp
 TARGET = glyph
 
 $(TARGET): $(SRC)
