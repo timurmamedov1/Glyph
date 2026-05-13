@@ -1,3 +1,4 @@
+#include "parser.h"
 #include "lexer.h"
 #include "error.h"
 #include <iostream>
