@@ -10,9 +10,8 @@ void printError(const GlyphError& e) {
     std::cerr << "[line " << e.line << "] Error: " << e.what() << std::endl;
 }
 
-// reads a file, tokenizes it, and prints each token.
-// this is temporary, just to verify the lexer works before
-// we add the parser and evaluator
+// reads a file, tokenizes, and parses it.
+// no evaluator yet so it just confirms parsing succeeds
 void runFile(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -26,21 +25,16 @@ void runFile(const std::string& filename) {
     try {
         Lexer lexer(ss.str());
         auto tokens = lexer.tokenize();
-
-        // just dump the tokens for now so we can check the lexer output
-        for (auto& token : tokens) {
-            std::cout << "line " << token.line
-                      << " | type " << (int)token.type
-                      << " | " << token.value << std::endl;
-        }
+        Parser parser(tokens);
+        auto ast = parser.parse();
     } catch (const GlyphError& e) {
         printError(e);
         exit(1);
     }
 }
 
-// interactive mode. reads one line at a time, tokenizes, prints.
-// later this becomes the real REPL once we have the parser and evaluator
+// interactive mode. reads one line at a time, tokenizes and parses.
+// no evaluator yet so theres no output, just error checking
 void runRepl() {
     std::cout << "Glyph" << std::endl;
     std::string line;
@@ -50,16 +44,11 @@ void runRepl() {
         if (!std::getline(std::cin, line)) break;
         if (line == "exit") break;
 
-        // same as runFile for each line of input
         try {
             Lexer lexer(line);
             auto tokens = lexer.tokenize();
-
-            for (auto& token : tokens) {
-                std::cout << "line " << token.line
-                          << " | type " << (int)token.type
-                          << " | " << token.value << std::endl;
-            }
+            Parser parser(tokens);
+            auto ast = parser.parse();
         } catch (const GlyphError& e) {
             printError(e);
         }
