@@ -1,3 +1,4 @@
+#include "evaluator.h"
 #include "parser.h"
 #include "lexer.h"
 #include "error.h"
@@ -10,8 +11,7 @@ void printError(const GlyphError& e) {
     std::cerr << "[line " << e.line << "] Error: " << e.what() << std::endl;
 }
 
-// reads a file, tokenizes, and parses it.
-// no evaluator yet so it just confirms parsing succeeds
+// reads a file and runs it through the full pipeline
 void runFile(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -27,17 +27,23 @@ void runFile(const std::string& filename) {
         auto tokens = lexer.tokenize();
         Parser parser(tokens);
         auto ast = parser.parse();
+
+        Evaluator evaluator;
+        for (auto& node : ast) {
+            evaluator.evaluate(node.get());
+        }
     } catch (const GlyphError& e) {
         printError(e);
         exit(1);
     }
 }
 
-// interactive mode. reads one line at a time, tokenizes and parses.
-// no evaluator yet so theres no output, just error checking
+// interactive mode. environment persists across lines so
+// variables defined on one line are available on the next
 void runRepl() {
     std::cout << "Glyph" << std::endl;
     std::string line;
+    Evaluator evaluator;
 
     while (1) {
         std::cout << "> " << std::flush;
@@ -49,6 +55,10 @@ void runRepl() {
             auto tokens = lexer.tokenize();
             Parser parser(tokens);
             auto ast = parser.parse();
+
+            for (auto& node : ast) {
+                evaluator.evaluate(node.get());
+            }
         } catch (const GlyphError& e) {
             printError(e);
         }
