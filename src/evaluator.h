@@ -62,6 +62,17 @@ std::string valueTypeName(const Value& v) {
     return "unknown";
 }
 
+// manual equality check bc variant == requires all types to support it
+// and Function doesnt. different types are never equal, functions are never equal
+Value valuesEqual(const Value& a, const Value& b) {
+    if (a.index() != b.index()) return false;
+    if (auto* l = std::get_if<double>(&a)) return *l == *std::get_if<double>(&b);
+    if (auto* l = std::get_if<bool>(&a)) return *l == *std::get_if<bool>(&b);
+    if (auto* l = std::get_if<std::string>(&a)) return *l == *std::get_if<std::string>(&b);
+    if (std::holds_alternative<std::nullptr_t>(a)) return true; // null == null
+    return false; // functions are never equal
+}
+
 // linked scope chain. each environment has a pointer to its parent,
 // so variable lookups walk up the chain until they find the name.
 // shared_ptr bc closures need to keep their captured scope alive
@@ -111,6 +122,95 @@ public:
             return b->value;
         if (dynamic_cast<NullLiteral*>(node))
             return nullptr;
+
+        // binary operators
+        if (auto* bin = dynamic_cast<BinaryExpr*>(node)) {
+            // and/or short circuit, so we evaluate the right side only if needed.
+            // they return the determining value, not a bool (python/js semantics)
+            if (bin->op == TokenType::AND) {
+                Value left = evaluate(bin->left.get());
+                if (!isTruthy(left)) return left;
+                return evaluate(bin->right.get());
+            }
+            if (bin->op == TokenType::OR) {
+                Value left = evaluate(bin->left.get());
+                if (isTruthy(left)) return left;
+                return evaluate(bin->right.get());
+            }
+
+            Value left = evaluate(bin->left.get());
+            Value right = evaluate(bin->right.get());
+
+            switch (bin->op) {
+                // arithmetic (both must be numbers)
+                case TokenType::MINUS:
+                case TokenType::STAR:
+                case TokenType::SLASH:
+                case TokenType::PERCENT: {
+                    auto* l = std::get_if<double>(&left);
+                    auto* r = std::get_if<double>(&right);
+                    if (!l || !r)
+                        throw GlyphError(bin->line, "Operands must be numbers.");
+                    if (bin->op == TokenType::MINUS) return *l - *r;
+                    if (bin->op == TokenType::STAR) return *l * *r;
+                    if (bin->op == TokenType::SLASH) {
+                        if (*r == 0) throw GlyphError(bin->line, "Division by zero.");
+                        return *l / *r;
+                    }
+                    // percent
+                    if (*r == 0) throw GlyphError(bin->line, "Modulo by zero.");
+                    return std::fmod(*l, *r);
+                }
+
+                // plus is overloaded: numbers add, strings concatenate
+                case TokenType::PLUS: {
+                    auto* ln = std::get_if<double>(&left);
+                    auto* rn = std::get_if<double>(&right);
+                    if (ln && rn) return *ln + *rn;
+                    auto* ls = std::get_if<std::string>(&left);
+                    auto* rs = std::get_if<std::string>(&right);
+                    if (ls && rs) return *ls + *rs;
+                    throw GlyphError(bin->line, "Operands must be two numbers or two strings.");
+                }
+
+                // comparison (both must be numbers)
+                case TokenType::LESS:
+                case TokenType::LESS_EQUAL:
+                case TokenType::GREATER:
+                case TokenType::GREATER_EQUAL: {
+                    auto* l = std::get_if<double>(&left);
+                    auto* r = std::get_if<double>(&right);
+                    if (!l || !r)
+                        throw GlyphError(bin->line, "Operands must be numbers.");
+                    if (bin->op == TokenType::LESS) return *l < *r;
+                    if (bin->op == TokenType::LESS_EQUAL) return *l <= *r;
+                    if (bin->op == TokenType::GREATER) return *l > *r;
+                    return *l >= *r;
+                }
+
+                // equality (any types, different types are never equal).
+                // cant use variant == bc Function has no operator==
+                case TokenType::EQUAL_EQUAL: return valuesEqual(left, right);
+                case TokenType::BANG_EQUAL: return !std::get<bool>(valuesEqual(left, right));
+
+                default:
+                    throw GlyphError(bin->line, "Unknown binary operator.");
+            }
+        }
+
+        // unary operators
+        if (auto* unary = dynamic_cast<UnaryExpr*>(node)) {
+            Value operand = evaluate(unary->operand.get());
+            if (unary->op == TokenType::MINUS) {
+                auto* n = std::get_if<double>(&operand);
+                if (!n) throw GlyphError(unary->line, "Operand must be a number.");
+                return -(*n);
+            }
+            if (unary->op == TokenType::BANG) {
+                return !isTruthy(operand);
+            }
+            throw GlyphError(unary->line, "Unknown unary operator.");
+        }
 
         // print
         if (auto* p = dynamic_cast<PrintStatement*>(node)) {
