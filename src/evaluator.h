@@ -212,6 +212,24 @@ public:
             throw GlyphError(unary->line, "Unknown unary operator.");
         }
 
+        // variable lookup
+        if (auto* id = dynamic_cast<Identifier*>(node))
+            return environment->get(id->name, id->line);
+
+        // let declaration
+        if (auto* let = dynamic_cast<LetStatement*>(node)) {
+            Value val = evaluate(let->initializer.get());
+            environment->define(let->name, val);
+            return nullptr;
+        }
+
+        // assignment (walks the scope chain to find where it was defined)
+        if (auto* assign = dynamic_cast<Assignment*>(node)) {
+            Value val = evaluate(assign->value.get());
+            environment->set(assign->name, val, assign->line);
+            return nullptr;
+        }
+
         // print
         if (auto* p = dynamic_cast<PrintStatement*>(node)) {
             Value val = evaluate(p->expression.get());
