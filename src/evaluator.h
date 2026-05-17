@@ -105,6 +105,14 @@ public:
     }
 };
 
+// thrown by return statements, caught by call expressions.
+// not an error, just a control flow mechanism to unwind the stack (same as jlox)
+class ReturnValue : public std::exception {
+public:
+    Value value;
+    ReturnValue(Value v) : value(std::move(v)) {}
+};
+
 class Evaluator {
 public:
     std::shared_ptr<Environment> environment;
@@ -247,6 +255,50 @@ public:
                 evaluate(whileStmt->body.get());
             }
             return nullptr;
+        }
+
+        // function declaration. captures the current environment for closures
+        if (auto* fnDecl = dynamic_cast<FunctionDecl*>(node)) {
+            Function fn{fnDecl->name, fnDecl->params, fnDecl->body.get(), environment};
+            environment->define(fnDecl->name, fn);
+            return nullptr;
+        }
+
+        // function call. evaluates the callee (which can be any expression),
+        // checks its a function, binds args to params in a new scope
+        // that chains off the closure, then executes the body
+        if (auto* call = dynamic_cast<CallExpr*>(node)) {
+            Value callee = evaluate(call->callee.get());
+            auto* fn = std::get_if<Function>(&callee);
+            if (!fn)
+                throw GlyphError(call->line, "Can only call functions.");
+            if (call->arguments.size() != fn->params.size())
+                throw GlyphError(call->line, "Expected " + std::to_string(fn->params.size())
+                    + " arguments but got " + std::to_string(call->arguments.size()) + ".");
+
+            // new environment with closure as parent, not the current scope
+            auto callEnv = std::make_shared<Environment>(fn->closure);
+            for (int i = 0; i < (int)fn->params.size(); i++) {
+                callEnv->define(fn->params[i], evaluate(call->arguments[i].get()));
+            }
+
+            auto previous = environment;
+            environment = callEnv;
+            Value result = nullptr;
+            try {
+                evaluate(fn->body);
+            } catch (ReturnValue& ret) {
+                result = std::move(ret.value);
+            }
+            environment = previous;
+            return result;
+        }
+
+        // return throws a ReturnValue exception to unwind back to the call site
+        if (auto* ret = dynamic_cast<ReturnStatement*>(node)) {
+            Value val = nullptr;
+            if (ret->value) val = evaluate(ret->value.get());
+            throw ReturnValue(std::move(val));
         }
 
         // print
