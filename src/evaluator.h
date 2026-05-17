@@ -230,6 +230,25 @@ public:
             return nullptr;
         }
 
+        // if/else. elseBranch can be a Block, another IfStatement (else if), or nullptr
+        if (auto* ifStmt = dynamic_cast<IfStatement*>(node)) {
+            Value cond = evaluate(ifStmt->condition.get());
+            if (isTruthy(cond)) {
+                evaluate(ifStmt->thenBranch.get());
+            } else if (ifStmt->elseBranch) {
+                evaluate(ifStmt->elseBranch.get());
+            }
+            return nullptr;
+        }
+
+        // while loop
+        if (auto* whileStmt = dynamic_cast<WhileStatement*>(node)) {
+            while (isTruthy(evaluate(whileStmt->condition.get()))) {
+                evaluate(whileStmt->body.get());
+            }
+            return nullptr;
+        }
+
         // print
         if (auto* p = dynamic_cast<PrintStatement*>(node)) {
             Value val = evaluate(p->expression.get());
