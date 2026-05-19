@@ -39,19 +39,40 @@ void runFile(const std::string& filename) {
 }
 
 // interactive mode. environment persists across lines so
-// variables defined on one line are available on the next
+// variables defined on one line are available on the next.
+// supports multi-line input by tracking brace depth
 void runRepl() {
     std::cout << "Glyph" << std::endl;
     std::string line;
     Evaluator evaluator;
+    // accumulate ASTs so function bodies (raw pointers) stay alive
+    std::vector<std::vector<std::unique_ptr<ASTNode>>> allAsts;
 
     while (1) {
         std::cout << "> " << std::flush;
         if (!std::getline(std::cin, line)) break;
         if (line == "exit") break;
 
+        // count braces to detect multi-line input. if theres more
+        // opens than closes, keep reading with the continuation prompt
+        std::string input = line;
+        int depth = 0;
+        for (char c : input) {
+            if (c == '{') depth++;
+            if (c == '}') depth--;
+        }
+        while (depth > 0) {
+            std::cout << "... " << std::flush;
+            if (!std::getline(std::cin, line)) break;
+            input += "\n" + line;
+            for (char c : line) {
+                if (c == '{') depth++;
+                if (c == '}') depth--;
+            }
+        }
+
         try {
-            Lexer lexer(line);
+            Lexer lexer(input);
             auto tokens = lexer.tokenize();
             Parser parser(tokens);
             auto ast = parser.parse();
@@ -59,6 +80,8 @@ void runRepl() {
             for (auto& node : ast) {
                 evaluator.evaluate(node.get());
             }
+            // keep the AST alive so function body pointers dont dangle
+            allAsts.push_back(std::move(ast));
         } catch (const GlyphError& e) {
             printError(e);
         }
