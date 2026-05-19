@@ -1,0 +1,17 @@
+// Uncomment one at a time to test error messages.
+
+// Undefined variable:
+// print(foo);
+
+// Type error in arithmetic:
+// print("hello" - 5);
+
+// Division by zero:
+// print(10 / 0);
+
+// Wrong argument count:
+// fn f(a, b) { return a + b; }
+// f(1);
+
+// Return outside function (parse error):
+// return 5;

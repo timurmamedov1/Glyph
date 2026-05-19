@@ -1,0 +1,7 @@
+let x = 10;
+let y = 20;
+print(x + y);        // 30
+x = 50;
+print(x);            // 50
+let name = "Glyph";
+print("Hello, " + name);  // Hello, Glyph

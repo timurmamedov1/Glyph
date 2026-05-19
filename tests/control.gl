@@ -1,0 +1,30 @@
+let x = 15;
+if (x > 10) {
+    print("big");
+} else {
+    print("small");
+}
+
+let grade = 85;
+if (grade >= 90) {
+    print("A");
+} else if (grade >= 80) {
+    print("B");
+} else {
+    print("C");
+}
+
+let i = 0;
+let sum = 0;
+while (i < 10) {
+    sum = sum + i;
+    i = i + 1;
+}
+print(sum);  // 45
+
+print(true and false);   // false
+print(true or false);    // true
+print(!true);            // false
+
+if (!0) { print("zero is falsy"); }
+if (!"") { print("empty string is falsy"); }

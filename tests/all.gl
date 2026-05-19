@@ -1,0 +1,88 @@
+print("=== Data Types ===");
+print(42);
+print(3.14);
+print("hello");
+print(true);
+print(false);
+print(null);
+
+print("=== Arithmetic ===");
+print(2 + 3);       // 5
+print(10 - 4);      // 6
+print(3 * 7);       // 21
+print(20 / 4);      // 5
+print(10 % 3);      // 1
+print(2 + 3 * 4);   // 14
+
+print("=== Comparison ===");
+print(1 < 2);       // true
+print(2 > 1);       // true
+print(1 == 1);      // true
+print(1 != 2);      // true
+print(1 >= 1);      // true
+print(1 <= 1);      // true
+
+print("=== Boolean Logic ===");
+print(true and true);    // true
+print(true and false);   // false
+print(false or true);    // true
+print(false or false);   // false
+print(!true);            // false
+print(!false);           // true
+
+print("=== Truthiness ===");
+print(!0);           // true
+print(!"");          // true
+print(!null);        // true
+print(!1);           // false
+print(!"hi");        // false
+
+print("=== Variables & Scoping ===");
+let a = 10;
+let b = 20;
+print(a + b);            // 30
+a = 99;
+print(a);                // 99
+{
+    let a = "shadow";
+    print(a);            // shadow
+}
+print(a);                // 99
+
+print("=== Strings ===");
+print("hello" + " " + "world");
+
+print("=== Control Flow ===");
+if (true) { print("if works"); }
+if (false) { print("bad"); } else { print("else works"); }
+let counter = 0;
+while (counter < 3) {
+    print(counter);
+    counter = counter + 1;
+}
+
+print("=== Functions ===");
+fn add(x, y) { return x + y; }
+print(add(3, 4));        // 7
+
+fn factorial(n) {
+    if (n <= 1) { return 1; }
+    return n * factorial(n - 1);
+}
+print(factorial(10));    // 3628800
+
+print("=== Closures ===");
+fn makeCounter() {
+    let count = 0;
+    fn increment() {
+        count = count + 1;
+        print(count);
+    }
+    return increment;
+}
+let c = makeCounter();
+c();  // 1
+c();  // 2
+c();  // 3
+
+print("=== Done ===");

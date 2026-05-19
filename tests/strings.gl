@@ -1,0 +1,9 @@
+let a = "hello";
+let b = " world";
+print(a + b);               // hello world
+print("line1\nline2");
+print("tab\there");
+print("quote: \"hi\"");
+if (a == "hello") {
+    print("match");
+}

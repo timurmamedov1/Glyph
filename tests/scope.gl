@@ -1,0 +1,15 @@
+let x = "outer";
+{
+    let x = "inner";
+    print(x);  // inner
+    {
+        let x = "innermost";
+        print(x);  // innermost
+    }
+    print(x);  // inner
+}
+print(x);  // outer
+
+let y = 1;
+{ y = 2; }
+print(y);  // 2
