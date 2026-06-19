@@ -1,8 +1,8 @@
 # Glyph
 
-A dynamically-typed programming language interpreter built from scratch in C++17 using no external libraries.
+A dynamically-typed programming language and interpreter built from scratch in C++17 using no external libraries.
 
-Built following [Crafting Interpreters](https://craftinginterpreters.com/) Part II (jlox, chapters 4–10), translated from Java to C++.
+Built using [Crafting Interpreters](https://craftinginterpreters.com/) Part II (jlox, chapters 4–10).
 
 ## The Language
 
@@ -23,7 +23,7 @@ Glyph supports numbers, strings, booleans, null, variables, control flow, first-
 
 ## Features
 
-- **Three-stage pipeline:** source => lexer => parser => tree-walk evaluator
+- **Three stages:** source => lexer => parser => tree-walk evaluator
 - **First-class functions** with lexical closures
 - **Recursive descent parser** with precedence climbing
 - **REPL** with multi-line input (brace balancing)
@@ -93,5 +93,5 @@ print(c());  // 2
 
 - **Language:** C++17
 - **Build:** Make
-- **Architecture:** header-only (single translation unit, project is small enough)
+- **Architecture:** header-only (singular .cpp file since project is small enough)
 - **External dependencies:** none
