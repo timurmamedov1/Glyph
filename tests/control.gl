@@ -28,3 +28,9 @@ print(!true);            // false
 
 if (!0) { print("zero is falsy"); }
 if (!"") { print("empty string is falsy"); }
+
+let total = 0;
+for (let j = 1; j <= 5; j = j + 1) {
+    total = total + j;
+}
+print(total);  // 15

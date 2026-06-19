@@ -111,6 +111,18 @@ public:
         : ASTNode(line), condition(std::move(condition)), body(std::move(body)) {}
 };
 
+class ForStatement : public ASTNode {
+public:
+    std::unique_ptr<ASTNode> initializer; // LetStatement, Assignment, ExpressionStatement, or nullptr
+    std::unique_ptr<ASTNode> condition;    // expression or nullptr (infinite loop)
+    std::unique_ptr<ASTNode> increment;    // Assignment, ExpressionStatement, or nullptr
+    std::unique_ptr<ASTNode> body;
+    ForStatement(int line, std::unique_ptr<ASTNode> initializer, std::unique_ptr<ASTNode> condition,
+                 std::unique_ptr<ASTNode> increment, std::unique_ptr<ASTNode> body)
+        : ASTNode(line), initializer(std::move(initializer)), condition(std::move(condition)),
+          increment(std::move(increment)), body(std::move(body)) {}
+};
+
 class FunctionDecl : public ASTNode {
 public:
     std::string name;
@@ -194,6 +206,7 @@ private:
             case TokenType::LET:    return parseLetStatement();
             case TokenType::IF:     return parseIfStatement();
             case TokenType::WHILE:  return parseWhileStatement();
+            case TokenType::FOR:    return parseForStatement();
             case TokenType::FN:     return parseFunctionDecl();
             case TokenType::RETURN: return parseReturnStatement();
             case TokenType::PRINT:  return parsePrintStatement();
@@ -238,6 +251,48 @@ private:
         expect(TokenType::RPAREN, "Expected ')' after while condition.");
         auto body = parseBlock();
         return std::make_unique<WhileStatement>(line, std::move(condition), std::move(body));
+    }
+
+    std::unique_ptr<ASTNode> parseForStatement() {
+        int line = advance().line;
+        expect(TokenType::LPAREN, "Expected '(' after 'for'.");
+
+        // initializer: let declaration, assignment/expression, or empty
+        std::unique_ptr<ASTNode> initializer = nullptr;
+        if (match(TokenType::SEMICOLON)) {
+            // empty
+        } else if (peek().type == TokenType::LET) {
+            initializer = parseLetStatement();
+        } else {
+            initializer = parseAssignmentOrExprStmt();
+        }
+
+        // condition
+        std::unique_ptr<ASTNode> condition = nullptr;
+        if (peek().type != TokenType::SEMICOLON) {
+            condition = parseExpression();
+        }
+        expect(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+
+        // increment (no trailing semicolon)
+        std::unique_ptr<ASTNode> increment = nullptr;
+        if (peek().type != TokenType::RPAREN) {
+            int incLine = peek().line;
+            if (peek().type == TokenType::IDENTIFIER && peekNext().type == TokenType::EQUAL) {
+                std::string name = advance().value;
+                advance();
+                auto value = parseExpression();
+                increment = std::make_unique<Assignment>(incLine, std::move(name), std::move(value));
+            } else {
+                auto expr = parseExpression();
+                increment = std::make_unique<ExpressionStatement>(incLine, std::move(expr));
+            }
+        }
+        expect(TokenType::RPAREN, "Expected ')' after for clauses.");
+
+        auto body = parseBlock();
+        return std::make_unique<ForStatement>(line, std::move(initializer), std::move(condition),
+                   std::move(increment), std::move(body));
     }
 
     std::unique_ptr<ASTNode> parseFunctionDecl() {

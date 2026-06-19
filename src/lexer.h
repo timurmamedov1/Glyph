@@ -10,7 +10,7 @@ enum class TokenType {
     NUMBER, STRING, IDENTIFIER,
 
     // keywords
-    LET, IF, ELSE, WHILE, FN, RETURN,
+    LET, IF, ELSE, WHILE, FOR, FN, RETURN,
     TRUE, FALSE, NULL_LITERAL,
     AND, OR,
     PRINT,
@@ -47,6 +47,7 @@ public:
         {"if", TokenType::IF},
         {"else", TokenType::ELSE},
         {"while", TokenType::WHILE},
+        {"for", TokenType::FOR},
         {"fn", TokenType::FN},
         {"return", TokenType::RETURN},
         {"true", TokenType::TRUE},

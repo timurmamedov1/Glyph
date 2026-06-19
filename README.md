@@ -14,10 +14,8 @@ fn fib(n) {
     return fib(n - 1) + fib(n - 2);
 }
 
-let i = 0;
-while (i < 10) {
+for (let i = 0; i < 10; i = i + 1) {
     print(fib(i));
-    i = i + 1;
 }
 ```
 
@@ -60,10 +58,12 @@ if (x > 50) {
 }
 
 // loops
-let i = 0;
-while (i < 5) {
+while (x > 0) {
+    x = x - 10;
+}
+
+for (let i = 0; i < 5; i = i + 1) {
     print(i);
-    i = i + 1;
 }
 
 // functions and closures
@@ -86,7 +86,7 @@ print(c());  // 2
 - `%` modulo operator
 - `0` and `""` are falsy
 - `else if` supported directly
-- No `for` loops, no classes, no inheritance
+- No classes, no inheritance
 - Assignment is a statement, not an expression
 
 ## Tech Stack

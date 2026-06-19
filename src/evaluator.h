@@ -257,6 +257,26 @@ public:
             return nullptr;
         }
 
+        // for loop. gets its own scope so the initializer variable
+        // is local to the loop, not the surrounding scope
+        if (auto* forStmt = dynamic_cast<ForStatement*>(node)) {
+            auto forEnv = std::make_shared<Environment>(environment);
+            auto previous = environment;
+            environment = forEnv;
+
+            if (forStmt->initializer) evaluate(forStmt->initializer.get());
+            while (1) {
+                if (forStmt->condition) {
+                    if (!isTruthy(evaluate(forStmt->condition.get()))) break;
+                }
+                evaluate(forStmt->body.get());
+                if (forStmt->increment) evaluate(forStmt->increment.get());
+            }
+
+            environment = previous;
+            return nullptr;
+        }
+
         // function declaration. captures the current environment for closures
         if (auto* fnDecl = dynamic_cast<FunctionDecl*>(node)) {
             Function fn{fnDecl->name, fnDecl->params, fnDecl->body.get(), environment};
