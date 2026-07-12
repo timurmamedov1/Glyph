@@ -1,5 +1,7 @@
 # Glyph
 
+[![CI](https://github.com/timurmamedov1/Glyph/actions/workflows/ci.yml/badge.svg)](https://github.com/timurmamedov1/Glyph/actions/workflows/ci.yml)
+
 A dynamically-typed programming language and interpreter built from scratch in C++17 using no external libraries.
 
 Built using [Crafting Interpreters](https://craftinginterpreters.com/) Part II (jlox, chapters 4–10).
@@ -34,6 +36,7 @@ Glyph supports numbers, strings, booleans, null, variables, control flow, first-
 
 ```bash
 make              # compile
+make test         # run the test suite
 ./glyph           # REPL mode
 ./glyph file.gl   # file mode
 ```
