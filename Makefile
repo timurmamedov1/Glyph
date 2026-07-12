@@ -6,7 +6,10 @@ TARGET = glyph
 $(TARGET): $(SRC)
 	$(LANG) $(FLAGS) -o $(TARGET) $(SRC)
 
+test: $(TARGET)
+	./run_tests.sh
+
 clean:
 	rm -f $(TARGET)
 
-.PHONY: clean
+.PHONY: test clean
