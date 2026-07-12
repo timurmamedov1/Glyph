@@ -1,0 +1,16 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # -Werror is already in the makefile flags so any warning fails the build
+      - name: build
+        run: make
+
+      - name: run tests
+        run: make test
