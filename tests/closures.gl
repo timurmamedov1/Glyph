@@ -1,0 +1,35 @@
+// nested closures: inner captures thru two enclosing scopes
+fn outer(a) {
+    fn mid(b) {
+        fn inner(c) {
+            return a + b + c;
+        }
+        return inner;
+    }
+    return mid;
+}
+
+// chained calls peel off one layer at a time
+print(outer(1)(2)(3));     // 6
+print(outer(10)(20)(30));  // 60
+
+// partial application, each partial keeps its own captured values
+let add5 = outer(2)(3);
+print(add5(1));    // 6
+print(add5(100));  // 105
+
+// two counters from the same factory dont share state
+fn makeCounter() {
+    let count = 0;
+    fn increment() {
+        count = count + 1;
+        return count;
+    }
+    return increment;
+}
+let c1 = makeCounter();
+let c2 = makeCounter();
+print(c1());  // 1
+print(c1());  // 2
+print(c2());  // 1
+print(c1());  // 3
