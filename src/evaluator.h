@@ -8,18 +8,19 @@
 #include <iostream>
 #include <cmath>
 #include <sstream>
+#include <algorithm>
 
-// forward declare so Function can hold shared_ptr<Environment>
+// forward declare so Function can hold an Environment*
 class Environment;
 
 // Function needs to be fully defined before Value bc variant
-// needs complete types. shared_ptr<Environment> works with
+// needs complete types. a pointer to Environment works with
 // just the forward declaration
 struct Function {
     std::string name;
     std::vector<std::string> params;
     ASTNode* body; // non-owning, AST must outlive execution
-    std::shared_ptr<Environment> closure;
+    Environment* closure; // non-owning, the Heap owns every environment
 };
 
 // the runtime value type. holds any glyph value
@@ -73,16 +74,23 @@ Value valuesEqual(const Value& a, const Value& b) {
     return false; // functions are never equal
 }
 
+// the environment a value keeps alive, nullptr if its not a function
+Environment* closureOf(const Value& v) {
+    auto* fn = std::get_if<Function>(&v);
+    return fn ? fn->closure : nullptr;
+}
+
 // linked scope chain. each environment has a pointer to its parent,
 // so variable lookups walk up the chain until they find the name.
-// shared_ptr bc closures need to keep their captured scope alive
+// raw pointers bc the Heap owns every environment and frees them once
+// theyre unreachable
 class Environment {
 public:
-    std::shared_ptr<Environment> parent;
+    Environment* parent;
     std::unordered_map<std::string, Value> variables;
+    bool marked; // set by the gc mark phase, cleared after each sweep
 
-    Environment() : parent(nullptr) {}
-    Environment(std::shared_ptr<Environment> parent) : parent(std::move(parent)) {}
+    Environment(Environment* parent) : parent(parent), marked(false) {}
 
     void define(const std::string& name, const Value& value) {
         variables[name] = value;
@@ -105,6 +113,63 @@ public:
     }
 };
 
+// mark and sweep garbage collector for environments. theyre the only thing
+// that can form cycles: a function stored in the scope it closes over points
+// back at that scope, so refcounting (shared_ptr) could never free them.
+// everything else in a Value is copied around by value
+class Heap {
+public:
+    static constexpr size_t MIN_THRESHOLD = 1024;
+
+    std::vector<std::unique_ptr<Environment>> objects; // owns every environment
+    std::vector<Environment*> gray; // marked but not traced yet
+    size_t nextGC; // collect once this many environments are alive
+
+    Heap() : nextGC(MIN_THRESHOLD) {}
+
+    Environment* allocate(Environment* parent) {
+        objects.push_back(std::make_unique<Environment>(parent));
+        return objects.back().get();
+    }
+
+    bool shouldCollect() {
+#ifdef GC_STRESS
+        return true; // collect on every allocation so a missing root shows up right away
+#else
+        return objects.size() >= nextGC;
+#endif
+    }
+
+    void mark(Environment* env) {
+        if (!env || env->marked) return;
+        env->marked = true;
+        gray.push_back(env);
+    }
+
+    // call after marking the roots. traces with an explicit gray stack instead
+    // of recursion so a long chain of closures cant blow the c++ stack, then
+    // frees everything that didnt get marked
+    void collect() {
+        while (!gray.empty()) {
+            Environment* env = gray.back();
+            gray.pop_back();
+            mark(env->parent);
+            for (auto& var : env->variables) {
+                mark(closureOf(var.second));
+            }
+        }
+
+        // erasing the unique_ptr is what deletes the environment
+        objects.erase(std::remove_if(objects.begin(), objects.end(),
+            [](const std::unique_ptr<Environment>& env) { return !env->marked; }), objects.end());
+        for (auto& env : objects) env->marked = false;
+
+        // threshold grows with the live set so collection cost stays
+        // proportional to allocation (same idea as clox's heap grow factor)
+        nextGC = std::max(objects.size() * 2, MIN_THRESHOLD);
+    }
+};
+
 // thrown by return statements, caught by call expressions.
 // not an error, just a control flow mechanism to unwind the stack (same as jlox)
 class ReturnValue : public std::exception {
@@ -115,9 +180,58 @@ public:
 
 class Evaluator {
 public:
-    std::shared_ptr<Environment> environment;
+    Heap heap; // declared first so its built before environment allocates from it
+    Environment* environment;
+    // gc roots besides environment. savedScopes are the scopes enclosing blocks
+    // and calls will swap back to (still live, just not current), tempRoots are
+    // envs held in c++ locals that nothing else points at yet
+    std::vector<Environment*> savedScopes;
+    std::vector<Environment*> tempRoots;
 
-    Evaluator() : environment(std::make_shared<Environment>()) {}
+    Evaluator() : environment(heap.allocate(nullptr)) {}
+
+    // swaps in a new current scope and swaps the old one back when it goes
+    // out of scope. RAII so a ReturnValue or GlyphError unwinding thru here
+    // still restores it, otherwise a runtime error left the repl stuck in
+    // whatever inner scope it was thrown from
+    struct ScopeGuard {
+        Evaluator& ev;
+
+        ScopeGuard(Evaluator& ev, Environment* env) : ev(ev) {
+            ev.savedScopes.push_back(ev.environment);
+            ev.environment = env;
+        }
+        ~ScopeGuard() {
+            ev.environment = ev.savedScopes.back();
+            ev.savedScopes.pop_back();
+        }
+    };
+
+    // keeps an env alive across evaluate() calls, popped when it goes out of scope
+    struct TempRoot {
+        Evaluator& ev;
+
+        TempRoot(Evaluator& ev, Environment* env) : ev(ev) { ev.tempRoots.push_back(env); }
+        ~TempRoot() { ev.tempRoots.pop_back(); }
+    };
+
+    // every environment gets allocated thru here and its the only place the gc
+    // runs. so any Environment* held across a call to evaluate() has to be
+    // reachable from a root, or it can get freed out from under us
+    Environment* newEnvironment(Environment* parent) {
+        if (heap.shouldCollect()) collectGarbage(parent);
+        return heap.allocate(parent);
+    }
+
+    // pending is the parent of an env about to be allocated. for a call thats
+    // the callees closure, which might only be referenced from a c++ local
+    void collectGarbage(Environment* pending = nullptr) {
+        heap.mark(environment);
+        for (auto* env : savedScopes) heap.mark(env);
+        for (auto* env : tempRoots) heap.mark(env);
+        heap.mark(pending);
+        heap.collect();
+    }
 
     // evaluates an AST node and returns its value
     Value evaluate(ASTNode* node) {
@@ -147,6 +261,9 @@ public:
             }
 
             Value left = evaluate(bin->left.get());
+            // the right side can trigger a gc, and if left is a function its
+            // closure might not be referenced anywhere else (makeCounter() == f())
+            TempRoot leftRoot(*this, closureOf(left));
             Value right = evaluate(bin->right.get());
 
             switch (bin->op) {
@@ -260,9 +377,7 @@ public:
         // for loop. gets its own scope so the initializer variable
         // is local to the loop, not the surrounding scope
         if (auto* forStmt = dynamic_cast<ForStatement*>(node)) {
-            auto forEnv = std::make_shared<Environment>(environment);
-            auto previous = environment;
-            environment = forEnv;
+            ScopeGuard scope(*this, newEnvironment(environment));
 
             if (forStmt->initializer) evaluate(forStmt->initializer.get());
             while (1) {
@@ -272,8 +387,6 @@ public:
                 evaluate(forStmt->body.get());
                 if (forStmt->increment) evaluate(forStmt->increment.get());
             }
-
-            environment = previous;
             return nullptr;
         }
 
@@ -296,21 +409,22 @@ public:
                 throw GlyphError(call->line, "Expected " + std::to_string(fn->params.size())
                     + " arguments but got " + std::to_string(call->arguments.size()) + ".");
 
-            // new environment with closure as parent, not the current scope
-            auto callEnv = std::make_shared<Environment>(fn->closure);
+            // new environment with closure as parent, not the current scope.
+            // rooted while the args evaluate bc an arg can call a function that
+            // triggers a gc, and nothing points at callEnv yet
+            Environment* callEnv = newEnvironment(fn->closure);
+            TempRoot callRoot(*this, callEnv);
             for (int i = 0; i < (int)fn->params.size(); i++) {
                 callEnv->define(fn->params[i], evaluate(call->arguments[i].get()));
             }
 
-            auto previous = environment;
-            environment = callEnv;
+            ScopeGuard scope(*this, callEnv);
             Value result = nullptr;
             try {
                 evaluate(fn->body);
             } catch (ReturnValue& ret) {
                 result = std::move(ret.value);
             }
-            environment = previous;
             return result;
         }
 
@@ -330,13 +444,10 @@ public:
 
         // blocks create a new scope
         if (auto* block = dynamic_cast<Block*>(node)) {
-            auto blockEnv = std::make_shared<Environment>(environment);
-            auto previous = environment;
-            environment = blockEnv;
+            ScopeGuard scope(*this, newEnvironment(environment));
             for (auto& stmt : block->statements) {
                 evaluate(stmt.get());
             }
-            environment = previous;
             return nullptr;
         }
 
