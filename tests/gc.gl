@@ -1,0 +1,103 @@
+// gc stress program. built with GC_STRESS (make sanitize) the gc runs on
+// every allocation, so this hits every spot an environment has to stay
+// rooted in the middle of evaluating something
+
+fn makeCounter() {
+    let count = 0;
+    fn increment() {
+        count = count + 1;
+        return count;
+    }
+    return increment;
+}
+
+fn makeAdder(n) {
+    fn adder(x) {
+        return x + n;
+    }
+    return adder;
+}
+
+fn add(a, b) {
+    return a + b;
+}
+
+fn square(x) {
+    return x * x;
+}
+
+fn apply(f, x) {
+    return f(x);
+}
+
+// args that call functions allocate while the outer calls scope
+// isnt stored anywhere yet
+print(add(square(3), square(4)));            // 25
+print(add(add(1, 2), add(add(3, 4), 5)));    // 15
+
+// a closure passed as an arg has to survive the later args allocating
+print(apply(makeAdder(10), square(5)));      // 35
+
+// the callee is a temporary closure, only the call itself references it
+print(makeAdder(1)(add(2, 3)));              // 6
+
+// comparing a temporary closure while the right side allocates
+print(makeAdder(1) == makeAdder(1));         // false
+
+// return unwinds thru a loop and a block inside the function
+fn findFirstOver(limit) {
+    for (let i = 0; i < 100; i = i + 1) {
+        {
+            if (square(i) > limit) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+print(findFirstOver(50));                    // 8
+
+// every makeCounter() call leaves a closure cycle behind as garbage,
+// kept has to survive all the collections in between
+let kept = makeCounter();
+for (let i = 0; i < 3000; i = i + 1) {
+    makeCounter();
+    if (i % 1000 == 0) {
+        kept();
+    }
+}
+print(kept());                               // 4
+
+// linked list made of closures, each link captures the one before it
+fn link(prev, value) {
+    fn node(wantValue) {
+        if (wantValue) {
+            return value;
+        }
+        return prev;
+    }
+    return node;
+}
+let head = null;
+for (let i = 1; i <= 500; i = i + 1) {
+    head = link(head, i);
+}
+let sum = 0;
+let cur = head;
+while (cur) {
+    sum = sum + cur(true);
+    cur = cur(false);
+}
+print(sum);                                  // 125250
+
+// recursion where every frame makes its own closure
+fn sumClosures(n) {
+    if (n == 0) {
+        return 0;
+    }
+    fn get() {
+        return n;
+    }
+    return get() + sumClosures(n - 1);
+}
+print(sumClosures(100));                     // 5050
