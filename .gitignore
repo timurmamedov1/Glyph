@@ -1,4 +1,6 @@
 glyph
+glyph_san
+gc_test
 *.o
 *.dSYM/
 .DS_Store

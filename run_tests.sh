@@ -4,8 +4,11 @@
 
 cd "$(dirname "$0")"
 
-if [ ! -x ./glyph ]; then
-    echo "no glyph binary, run make first"
+# make sanitize points this at the sanitizer build instead
+glyph=${GLYPH:-./glyph}
+
+if [ ! -x "$glyph" ]; then
+    echo "no $glyph binary, run make first"
     exit 1
 fi
 
@@ -23,7 +26,7 @@ for test in tests/*.gl; do
     fi
 
     # capture stderr too so error output regressions get caught
-    actual=$(./glyph "$test" 2>&1)
+    actual=$("$glyph" "$test" 2>&1)
 
     if [ "$actual" == "$(cat "$expected")" ]; then
         echo "PASS $name"
