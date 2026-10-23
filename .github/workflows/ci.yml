@@ -14,3 +14,20 @@ jobs:
 
       - name: run tests
         run: make test
+
+      - name: gc unit tests
+        run: make gctest
+
+  # every test program again under asan + ubsan with the gc running on every
+  # allocation. lsan comes with asan on linux so leaks fail it too
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # older asan runtimes crash on the aslr entropy newer runner kernels use
+      - name: lower aslr entropy for asan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: run tests under sanitizers
+        run: make sanitize
